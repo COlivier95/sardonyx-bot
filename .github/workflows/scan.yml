@@ -5,8 +5,8 @@ on:
     - cron: "*/5 * * * *"   # toutes les 5 min (GitHub peut décaler de quelques minutes)
   workflow_dispatch:         # bouton "Run workflow" pour tester à la main
     inputs:
-      test_call:
-        description: "Passer un appel Telegram de test"
+      test_wake:
+        description: "Envoyer une alerte de réveil de test (e-mail SARDONYX)"
         type: boolean
         default: false
 
@@ -20,7 +20,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
@@ -31,8 +31,9 @@ jobs:
       - name: Scanner Mercari et Yahoo
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          CALLMEBOT_USER: ${{ secrets.CALLMEBOT_USER }}
-          TEST_CALL: ${{ inputs.test_call && '1' || '0' }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          TEST_WAKE: ${{ inputs.test_wake && '1' || '0' }}
         run: node scan.mjs
 
       - name: Mémoriser les annonces vues

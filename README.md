@@ -33,15 +33,16 @@ Ensuite tout tourne seul, même ordinateur éteint.
 - Pour mettre en pause : Actions → Scan sardonyx → « … » → Disable workflow.
 - Le fichier `seen.json` mémorise les annonces déjà signalées, pour ne jamais t'alerter deux fois.
 
-## Appel téléphonique la nuit (optionnel, gratuit)
+## Réveil la nuit sur iPhone (optionnel, gratuit)
 
-Pour les achats immédiats (Mercari, Rakuma, Yahoo!フリマ, Reddit), le bot peut aussi t'appeler sur **Telegram** et lire l'alerte à voix haute, via le service gratuit CallMeBot. Un seul appel par passage, même s'il y a plusieurs annonces.
+iOS ne permet pas de réagir à une notification d'une autre app. Le bot envoie donc aussi un **e-mail** dont le sujet commence par `SARDONYX`, pour les achats immédiats (Mercari, Rakuma, Yahoo!フリマ, Reddit). Une automatisation Raccourcis lance alors un minuteur de l'app Horloge, qui sonne même en silencieux et en mode Sommeil.
 
-1. Installe Telegram et choisis un nom d'utilisateur (Réglages → Modifier le profil → Nom d'utilisateur), par ex. `@tonpseudo`.
-2. Autorise CallMeBot : envoie `/start` au compte **@CallMeBot_txtbot** sur Telegram.
-3. Dans Telegram → Réglages → Confidentialité → Appels : autorise « Tout le monde » (ou au moins ce bot).
-4. Sur GitHub, ajoute un secret `CALLMEBOT_USER` = `@tonpseudo` (Settings → Secrets and variables → Actions).
-5. Test : Actions → Scan sardonyx → Run workflow → coche « Passer un appel Telegram de test ».
+1. Utilise une adresse **iCloud Mail** (@icloud.com) dans l'app Mail : c'est la seule qui arrive instantanément (push). Gmail dans l'app Mail n'est relevé que toutes les 15 min ou plus.
+2. Crée un compte gratuit sur ntfy.sh, vérifie ton adresse iCloud dans Account, puis crée un jeton d'accès (Account → Access tokens).
+3. Sur GitHub, ajoute deux secrets : `NTFY_TOKEN` (le jeton `tk_…`) et `ALERT_EMAIL` (ton adresse iCloud).
+4. Sur l'iPhone, Raccourcis → Automatisation → + → **E-mail** :
+   - Expéditeur : `ntfy@ntfy.sh` · Objet contient : `SARDONYX` · **Exécuter immédiatement**
+   - Action : **Démarrer le minuteur** → 3 secondes.
+5. Test : Actions → Scan sardonyx → Run workflow → coche « Envoyer une alerte de réveil de test ».
 
-Sur iPhone, autorise Telegram dans le mode Concentration « Sommeil » / « Ne pas déranger » pour que l'appel sonne la nuit.
-Pour être appelé aussi pour les enchères, ajoute une variable `CALL_FOR` = `all`.
+Pour être réveillé aussi pour les enchères, ajoute une variable `WAKE_FOR` = `all`.

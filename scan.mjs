@@ -27,9 +27,12 @@ const FX = Number(process.env.JPY_PER_USD || 156);
 const MAX_AGE_H = 72;                                // ignore les annonces plus vieilles
 const STATE_FILE = "seen.json";
 const DRY = process.env.DRY_RUN === "1";
-// Appel vocal Telegram via CallMeBot (gratuit) — actif seulement si le secret CALLMEBOT_USER existe
-const CALL_USER = process.env.CALLMEBOT_USER;          // ex. @tonpseudo
-const CALL_FOR = process.env.CALL_FOR || "buynow";     // "buynow" (achats immédiats) ou "all"
+// Réveil iPhone : ntfy envoie aussi un e-mail "SARDONYX" → une automatisation Raccourcis lance un minuteur.
+// Actif seulement si les secrets NTFY_TOKEN (compte ntfy gratuit) et ALERT_EMAIL existent.
+const NTFY_TOKEN = process.env.NTFY_TOKEN;
+const ALERT_EMAIL = process.env.ALERT_EMAIL;
+const WAKE_FOR = process.env.WAKE_FOR || "buynow";     // "buynow" (achats immédiats) ou "all"
+const WAKE = Boolean(NTFY_TOKEN && ALERT_EMAIL);
 
 // ---------- Utilitaires ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -227,38 +230,11 @@ export function buildNotification(it) {
   };
 }
 
-export function callText(items) {
-  const model = (t) => { const m = t.match(/6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000/); return m ? m[0].replace(/[^0-9]+/g, " ") : "cadran en pierre"; };
-  const it = items[0];
-  const prix = it.price != null ? `${Number(it.price).toLocaleString("fr-FR")} yens` : (it.priceText || "prix sur l'annonce");
-  let t = `Alerte Seiko sardonyx. Nouvelle annonce ${it.source.replace("r/", "reddit ")}, ${model(it.title)}, ${prix}.`;
-  if (items.length > 1) t += ` Et ${items.length - 1} autre${items.length > 2 ? "s" : ""}.`;
-  return (t + " Regarde tes notifications n t f y.").slice(0, 250);
-}
-
-async function call(items, fetchFn = fetch) {
-  const text = callText(items);
-  if (DRY) { console.log("[DRY] appel:", text); return; }
-  const url = `https://api.callmebot.com/start.php?user=${encodeURIComponent(CALL_USER)}&text=${encodeURIComponent(text)}&lang=fr-FR-Standard-A&rpt=2&cc=missed`;
-  // le service gratuit est parfois saturé ("FLOOD") : on réessaie jusqu’à 6 fois sur ~6 min
-  for (let attempt = 1; attempt <= 6; attempt++) {
-    try {
-      const res = await fetchFn(url);
-      const body = (await res.text()).replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-      const queued = /call (has been )?queued|Call queued/i.test(body);
-      const refused = /FLOOD|skipped|ERROR/i.test(body);
-      const ok = res.ok && (queued || !refused);
-      console.log(`callmebot essai ${attempt}: HTTP ${res.status} ${ok ? "OK" : "REFUSÉ"} | ${body.slice(-220)}`);
-      if (ok) return true;
-    } catch (e) { console.error("callmebot", e.message); }
-    if (attempt < 6) await sleep(fetchFn === fetch ? 70000 : 0);
-  }
-  return false;
-}
-
 async function send(payload, fetchFn = fetch) {
   if (DRY) { console.log("[DRY] notification:", JSON.stringify(payload)); return; }
-  const res = await fetchFn(NTFY_SERVER, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const headers = { "Content-Type": "application/json" };
+  if (NTFY_TOKEN) headers.Authorization = `Bearer ${NTFY_TOKEN}`;
+  const res = await fetchFn(NTFY_SERVER, { method: "POST", headers, body: JSON.stringify(payload) });
   if (!res.ok) console.error("ntfy HTTP", res.status, await res.text());
 }
 
@@ -305,19 +281,20 @@ export async function run({ fetchFn = fetch, state } = {}) {
   }
 
   let sent = 0;
-  const toCall = [];
   for (const it of found.values()) {
     if (state.seen[it.key]) continue;
     state.seen[it.key] = now;
     if (firstRun || !state.seeded[it.key.split(":")[0]]) continue;
     if (now - it.created > MAX_AGE_H * 3600e3) continue;
-    await send(buildNotification(it), fetchFn);
+    const n = buildNotification(it);
+    if (WAKE && (WAKE_FOR === "all" || it.buyNow)) { n.email = ALERT_EMAIL; n.title = "SARDONYX " + n.title; }
+    await send(n, fetchFn);
     sent++;
-    if (CALL_FOR === "all" || it.buyNow) toCall.push(it);
   }
-  // un seul appel par passage, même s'il y a plusieurs annonces
-  if (CALL_USER && toCall.length) await call(toCall, fetchFn);
-  if (CALL_USER && process.env.TEST_CALL === "1") await call([{ source: "test", title: "6020-5280", price: 98000 }], fetchFn);
+  if (process.env.TEST_WAKE === "1") {
+    if (!WAKE) console.error("TEST_WAKE : secrets NTFY_TOKEN et/ou ALERT_EMAIL manquants");
+    else await send({ topic: NTFY_TOPIC, title: "SARDONYX ⚡ Test de réveil", message: "Test : ton iPhone devrait lancer le minuteur.", email: ALERT_EMAIL, priority: 5, tags: ["alarm_clock"] }, fetchFn);
+  }
 
   if (firstRun) {
     await send({ topic: NTFY_TOPIC, title: "✅ Bot sardonyx actif", message: `${found.size} annonce(s) déjà en ligne mémorisées. Tu recevras désormais une alerte pour chaque nouvelle annonce.\nMercari : ${ok.mercari}/${KEYWORDS.length} · Yahoo : ${ok.yahoo}/${KEYWORDS.length} · Rakuma : ${ok.rakuma}/${KEYWORDS.length} · Reddit : ${ok.reddit ? "OK" : "échec"}`, priority: 3, tags: ["watch"] }, fetchFn);
