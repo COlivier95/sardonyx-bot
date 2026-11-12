@@ -1,6 +1,6 @@
 # Bot d'alerte Seiko Sardonyx
 
-Surveille Mercari Japon (et Mercari Shops), Yahoo! Auctions et Yahoo!フリマ toutes les 5 minutes, et envoie une notification sur ton téléphone dès qu'une nouvelle annonce correspond à l'un des trois modèles :
+Surveille Mercari Japon (et Mercari Shops), Yahoo! Auctions, Yahoo!フリマ, Rakuma et Reddit r/Watchexchange toutes les 5 minutes, et envoie une notification sur ton téléphone dès qu'une nouvelle annonce correspond à l'un des trois modèles :
 
 - 7820-5000 (CHG803), 6020-5260 (CGT073 / AGT023), 6020-5280 (CGT031)
 - ou un titre Seiko / Chariot / Dolce qui parle de sardonyx, agate (瑪瑙, メノウ) ou cadran « façon bois » (木目)

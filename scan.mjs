@@ -1,4 +1,4 @@
-// Bot d'alerte Seiko Sardonyx — Mercari Japon + Yahoo! Auctions (incl. Yahoo!フリマ)
+// Bot d'alerte Seiko Sardonyx — Mercari Japon, Yahoo! Auctions (incl. Yahoo!フリマ), Rakuma, r/Watchexchange
 // Envoie une notification push (ntfy) dès qu'une nouvelle annonce correspond.
 // Aucune dépendance : Node 20+ (fetch + WebCrypto natifs).
 import { readFile, writeFile } from "node:fs/promises";
@@ -16,7 +16,7 @@ const KEYWORDS = [
 // Un titre est retenu s'il contient un calibre / une référence…
 const STRONG = /6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000|CHG\s?803|CGT\s?0?31|CGT\s?073|AGT\s?023/i;
 // …ou un mot "pierre" ET un mot "Seiko"
-const STONE = /サードニクス|サードニックス|サードオニキス|sardonyx|瑪瑙|メノウ|めのう|agate|木目|タイガーアイ|石文字盤|天然石|ストーン/i;
+const STONE = /サードニクス|サードニックス|サードオニキス|sardonyx|瑪瑙|メノウ|めのう|agate|木目|タイガーアイ|石文字盤|天然石|ストーン|stone dial|wood ?grain|tiger ?eye/i;
 const SEIKO = /seiko|セイコー|せいこー|シャリオ|チャリオ|chariot|ドルチェ|dolce/i;
 // Exclus : autres gammes, objets, cadrans explicitement noirs
 const EXCLUDE = /クレドール|credor|置時計|置き時計|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial|三菱|グランディス|ブレーキ|ワイパー|ヘッドライト|ルームランプ|シフトノブ|ステアリング|ハンドル|N84W|N94W/i;
@@ -137,20 +137,84 @@ export async function searchYahoo(keyword, fetchFn = fetch) {
   return parseYahoo(await res.text());
 }
 
+// ---------- Rakuma (fril.jp) ----------
+const unescapeHtml = (t) => t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+export function parseRakuma(html) {
+  const out = new Map();
+  const re = /<a href="https:\/\/item\.fril\.jp\/([0-9a-f]+)" class="link_search_image"([\s\S]*?)<\/a>/g;
+  for (const m of html.matchAll(re)) {
+    const [, id, body] = m;
+    if (out.has(id)) continue;
+    const name = body.match(/data-rat-item_name="([^"]*)"/);
+    const price = body.match(/data-rat-price="(\d+)"/);
+    const img = body.match(/data-original="([^"]+)"/);
+    if (!name) continue;
+    out.set(id, {
+      key: "rakuma:" + id, source: "Rakuma", title: unescapeHtml(name[1]),
+      price: price ? Number(price[1]) : null, created: Date.now(),
+      image: img ? img[1] : null, url: `https://item.fril.jp/${id}`,
+      buyee: null, buyNow: true,
+    });
+  }
+  return [...out.values()];
+}
+
+export async function searchRakuma(keyword, fetchFn = fetch) {
+  const url = `https://fril.jp/s?query=${encodeURIComponent(keyword)}&order=desc&sort=created_at&transaction=selling`;
+  const res = await fetchFn(url, { headers: { "User-Agent": UA, "Accept-Language": "ja,en;q=0.8" } });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`Rakuma HTTP ${res.status}`);
+  return parseRakuma(await res.text());
+}
+
+// ---------- Reddit r/Watchexchange (dernières annonces, tous mots confondus) ----------
+const REDDIT_UA = "sardonyx-bot/1.0 (personal watch alert; github.com/COlivier95/sardonyx-bot)";
+function redditItem(p) {
+  return {
+    key: "reddit:" + p.id, source: "r/Watchexchange", title: p.title, price: null, priceText: (p.title.match(/\$\s?[\d,]+/) || [""])[0],
+    created: p.created * 1000, image: null, url: p.url, buyee: null, buyNow: true,
+  };
+}
+export function parseRedditRss(xml) {
+  const out = [];
+  for (const m of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const e = m[1];
+    const id = (e.match(/<id>t3_(\w+)<\/id>/) || [])[1];
+    const title = unescapeHtml((e.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || "");
+    const link = (e.match(/<link href="([^"]+)"/) || [])[1];
+    const upd = (e.match(/<(?:published|updated)>([^<]+)</) || [])[1];
+    if (id && title) out.push(redditItem({ id, title, url: link, created: Date.parse(upd || Date.now()) / 1000 }));
+  }
+  return out;
+}
+export async function searchReddit(_kw, fetchFn = fetch) {
+  const headers = { "User-Agent": REDDIT_UA };
+  let res = await fetchFn("https://www.reddit.com/r/Watchexchange/new.json?limit=100&raw_json=1", { headers });
+  if (res.ok) {
+    const j = await res.json();
+    return (j.data?.children || []).map((c) => redditItem({ id: c.data.id, title: c.data.title, url: "https://www.reddit.com" + c.data.permalink, created: c.data.created_utc }))
+      .filter((it) => !/\[\s*WTB\s*\]/i.test(it.title));
+  }
+  res = await fetchFn("https://www.reddit.com/r/Watchexchange/new/.rss?limit=100", { headers });
+  if (!res.ok) throw new Error(`Reddit HTTP ${res.status}`);
+  return parseRedditRss(await res.text()).filter((it) => !/\[\s*WTB\s*\]/i.test(it.title));
+}
+
 // ---------- Notifications (ntfy) ----------
 export function buildNotification(it) {
   const lines = [it.title];
-  if (it.buyNow) lines.push(`Achat immédiat : ${yen(it.price)} (${usd(it.price)})`);
+  if (it.price == null) lines.push(it.priceText ? `Prix annoncé : ${it.priceText}` : "Prix : voir l'annonce");
+  else if (it.buyNow) lines.push(`Achat immédiat : ${yen(it.price)} (${usd(it.price)})`);
   else {
     lines.push(`Enchère : ${yen(it.price)} (${usd(it.price)}) · ${it.bids} enchère(s)`);
     if (it.buyNowPrice) lines.push(`Achat immédiat possible : ${yen(it.buyNowPrice)} (${usd(it.buyNowPrice)})`);
     if (it.end) lines.push(`Fin : ${pacific(it.end)} (heure de Californie)`);
   }
-  const actions = [{ action: "view", label: it.source.startsWith("Yahoo") ? "Voir sur Yahoo" : "Voir sur Mercari", url: it.url, clear: false }];
+  const actions = [{ action: "view", label: "Voir sur " + it.source.replace(/!.*/, "").replace(" Shops", ""), url: it.url, clear: false }];
   if (it.buyee) actions.push({ action: "view", label: "Ouvrir dans Buyee", url: it.buyee, clear: false });
   return {
     topic: NTFY_TOPIC,
-    title: `${it.buyNow ? "⚡" : "🔨"} ${it.source} · ${yen(it.price)}`,
+    title: `${it.buyNow ? "⚡" : "🔨"} ${it.source}${it.price != null ? " · " + yen(it.price) : it.priceText ? " · " + it.priceText : ""}`,
     message: lines.join("\n"),
     click: it.url,
     attach: it.image || undefined,
@@ -171,14 +235,22 @@ export async function run({ fetchFn = fetch, state } = {}) {
   if (!NTFY_TOPIC && !DRY) throw new Error("NTFY_TOPIC manquant");
   state = state || JSON.parse(await readFile(STATE_FILE, "utf8").catch(() => "{}"));
   state.seen ||= {};
-  state.fails ||= { mercari: 0, yahoo: 0 };
+  const SOURCES = { mercari: searchMercari, yahoo: searchYahoo, rakuma: searchRakuma };
+  state.fails = { mercari: 0, yahoo: 0, rakuma: 0, reddit: 0, ...(state.fails || {}) };
   const firstRun = Object.keys(state.seen).length === 0;
+  // chaque site est d'abord mémorisé en silence (évite une rafale d'alertes à l'ajout d'un site)
+  state.seeded ||= firstRun ? {} : { mercari: true, yahoo: true };
   const now = Date.now();
   const found = new Map();
-  const ok = { mercari: 0, yahoo: 0 };
+  const ok = { mercari: 0, yahoo: 0, rakuma: 0, reddit: 0 };
+
+  try {
+    for (const it of await searchReddit(null, fetchFn)) if (isMatch(it.title)) found.set(it.key, it);
+    ok.reddit = 1;
+  } catch (e) { console.error("reddit", e.message); }
 
   for (const kw of KEYWORDS) {
-    for (const [src, fn] of [["mercari", searchMercari], ["yahoo", searchYahoo]]) {
+    for (const [src, fn] of Object.entries(SOURCES)) {
       try {
         for (const it of await fn(kw, fetchFn)) if (isMatch(it.title)) found.set(it.key, it);
         ok[src]++;
@@ -190,7 +262,7 @@ export async function run({ fetchFn = fetch, state } = {}) {
   }
 
   // santé des sources : alerte après 6 échecs complets d'affilée (~30 min), puis au retour
-  for (const src of ["mercari", "yahoo"]) {
+  for (const src of Object.keys(ok)) {
     if (ok[src] === 0) {
       state.fails[src]++;
       if (state.fails[src] === 6) await send({ topic: NTFY_TOPIC, title: `⚠️ Bot sardonyx : ${src} ne répond plus`, message: "Le bot continue d'essayer. Il te préviendra quand ça repart.", priority: 3, tags: ["warning"] }, fetchFn);
@@ -204,19 +276,20 @@ export async function run({ fetchFn = fetch, state } = {}) {
   for (const it of found.values()) {
     if (state.seen[it.key]) continue;
     state.seen[it.key] = now;
-    if (firstRun) continue;
+    if (firstRun || !state.seeded[it.key.split(":")[0]]) continue;
     if (now - it.created > MAX_AGE_H * 3600e3) continue;
     await send(buildNotification(it), fetchFn);
     sent++;
   }
   if (firstRun) {
-    await send({ topic: NTFY_TOPIC, title: "✅ Bot sardonyx actif", message: `${found.size} annonce(s) déjà en ligne mémorisées. Tu recevras désormais une alerte pour chaque nouvelle annonce.\nMercari : ${ok.mercari}/${KEYWORDS.length} recherches OK · Yahoo : ${ok.yahoo}/${KEYWORDS.length}`, priority: 3, tags: ["watch"] }, fetchFn);
+    await send({ topic: NTFY_TOPIC, title: "✅ Bot sardonyx actif", message: `${found.size} annonce(s) déjà en ligne mémorisées. Tu recevras désormais une alerte pour chaque nouvelle annonce.\nMercari : ${ok.mercari}/${KEYWORDS.length} · Yahoo : ${ok.yahoo}/${KEYWORDS.length} · Rakuma : ${ok.rakuma}/${KEYWORDS.length} · Reddit : ${ok.reddit ? "OK" : "échec"}`, priority: 3, tags: ["watch"] }, fetchFn);
   }
 
+  for (const src of Object.keys(ok)) if (ok[src] > 0) state.seeded[src] = true;
   // garde les 5000 annonces les plus récentes en mémoire
   const entries = Object.entries(state.seen).sort((a, b) => b[1] - a[1]).slice(0, 5000);
   state.seen = Object.fromEntries(entries);
-  console.log(`matches=${found.size} new_sent=${sent} mercari_ok=${ok.mercari} yahoo_ok=${ok.yahoo} first=${firstRun}`);
+  console.log(`matches=${found.size} new_sent=${sent} ok=${JSON.stringify(ok)} first=${firstRun}`);
   return state;
 }
 
