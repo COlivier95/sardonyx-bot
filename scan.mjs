@@ -19,7 +19,7 @@ const STRONG = /6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000|CHG\s
 const STONE = /サードニクス|サードニックス|サードオニキス|sardonyx|瑪瑙|メノウ|めのう|agate|木目|タイガーアイ|石文字盤|天然石|ストーン/i;
 const SEIKO = /seiko|セイコー|せいこー|シャリオ|チャリオ|chariot|ドルチェ|dolce/i;
 // Exclus : autres gammes, objets, cadrans explicitement noirs
-const EXCLUDE = /クレドール|credor|置時計|置き時計|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial/i;
+const EXCLUDE = /クレドール|credor|置時計|置き時計|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial|三菱|グランディス|ブレーキ|ワイパー|ヘッドライト|ルームランプ|シフトノブ|ステアリング|ハンドル|N84W|N94W/i;
 
 const NTFY_TOPIC = process.env.NTFY_TOPIC;           // obligatoire (secret GitHub)
 const NTFY_SERVER = process.env.NTFY_SERVER || "https://ntfy.sh";
