@@ -1,0 +1,40 @@
+name: Scan sardonyx
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # toutes les 5 min (GitHub peut décaler de quelques minutes)
+  workflow_dispatch: {}      # bouton "Run workflow" pour tester à la main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Scanner Mercari et Yahoo
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: node scan.mjs
+
+      - name: Mémoriser les annonces vues
+        run: |
+          # GitHub met en pause les tâches planifiées après 60 jours sans activité :
+          # un petit fichier daté est mis à jour toutes les 3 semaines pour l'éviter.
+          last=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - last )) -gt 1814400 ]; then date -u +%FT%TZ > keepalive.txt; fi
+          git config user.name "sardonyx-bot"
+          git config user.email "sardonyx-bot@users.noreply.github.com"
+          git add seen.json keepalive.txt 2>/dev/null || git add seen.json
+          git diff --cached --quiet || (git commit -m "scan: annonces vues" && git push)
