@@ -242,7 +242,7 @@ async function call(items, fetchFn = fetch) {
   const url = `https://api.callmebot.com/start.php?user=${encodeURIComponent(CALL_USER)}&text=${encodeURIComponent(text)}&lang=fr-FR-Standard-A&rpt=2&cc=missed`;
   try {
     const res = await fetchFn(url);
-    console.log("callmebot HTTP", res.status, (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200));
+    console.log("callmebot HTTP", res.status, (await res.text()).replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 500));
   } catch (e) { console.error("callmebot", e.message); }
 }
 
