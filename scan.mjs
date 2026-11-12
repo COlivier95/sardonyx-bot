@@ -132,6 +132,7 @@ export function parseYahoo(html) {
 export async function searchYahoo(keyword, fetchFn = fetch) {
   const url = `https://auctions.yahoo.co.jp/search/search?p=${encodeURIComponent(keyword)}&n=50&s1=new&o1=d`;
   const res = await fetchFn(url, { headers: { "User-Agent": UA, "Accept-Language": "ja,en;q=0.8" } });
+  if (res.status === 404) return []; // Yahoo répond 404 quand la recherche n'a aucun résultat
   if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
   return parseYahoo(await res.text());
 }
