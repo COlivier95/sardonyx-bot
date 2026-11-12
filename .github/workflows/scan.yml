@@ -3,7 +3,12 @@ name: Scan sardonyx
 on:
   schedule:
     - cron: "*/5 * * * *"   # toutes les 5 min (GitHub peut décaler de quelques minutes)
-  workflow_dispatch: {}      # bouton "Run workflow" pour tester à la main
+  workflow_dispatch:         # bouton "Run workflow" pour tester à la main
+    inputs:
+      test_call:
+        description: "Passer un appel Telegram de test"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,6 +31,8 @@ jobs:
       - name: Scanner Mercari et Yahoo
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          CALLMEBOT_USER: ${{ secrets.CALLMEBOT_USER }}
+          TEST_CALL: ${{ inputs.test_call && '1' || '0' }}
         run: node scan.mjs
 
       - name: Mémoriser les annonces vues

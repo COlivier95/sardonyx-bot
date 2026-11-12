@@ -32,3 +32,16 @@ Ensuite tout tourne seul, même ordinateur éteint.
 - Pour ajouter ou retirer un mot-clé : modifie la liste `KEYWORDS` en haut de `scan.mjs` (bouton crayon sur GitHub).
 - Pour mettre en pause : Actions → Scan sardonyx → « … » → Disable workflow.
 - Le fichier `seen.json` mémorise les annonces déjà signalées, pour ne jamais t'alerter deux fois.
+
+## Appel téléphonique la nuit (optionnel, gratuit)
+
+Pour les achats immédiats (Mercari, Rakuma, Yahoo!フリマ, Reddit), le bot peut aussi t'appeler sur **Telegram** et lire l'alerte à voix haute, via le service gratuit CallMeBot. Un seul appel par passage, même s'il y a plusieurs annonces.
+
+1. Installe Telegram et choisis un nom d'utilisateur (Réglages → Modifier le profil → Nom d'utilisateur), par ex. `@tonpseudo`.
+2. Autorise CallMeBot : envoie `/start` au compte **@CallMeBot_txtbot** sur Telegram.
+3. Dans Telegram → Réglages → Confidentialité → Appels : autorise « Tout le monde » (ou au moins ce bot).
+4. Sur GitHub, ajoute un secret `CALLMEBOT_USER` = `@tonpseudo` (Settings → Secrets and variables → Actions).
+5. Test : Actions → Scan sardonyx → Run workflow → coche « Passer un appel Telegram de test ».
+
+Sur iPhone, autorise Telegram dans le mode Concentration « Sommeil » / « Ne pas déranger » pour que l'appel sonne la nuit.
+Pour être appelé aussi pour les enchères, ajoute une variable `CALL_FOR` = `all`.

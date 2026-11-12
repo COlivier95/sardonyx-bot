@@ -27,6 +27,9 @@ const FX = Number(process.env.JPY_PER_USD || 156);
 const MAX_AGE_H = 72;                                // ignore les annonces plus vieilles
 const STATE_FILE = "seen.json";
 const DRY = process.env.DRY_RUN === "1";
+// Appel vocal Telegram via CallMeBot (gratuit) — actif seulement si le secret CALLMEBOT_USER existe
+const CALL_USER = process.env.CALLMEBOT_USER;          // ex. @tonpseudo
+const CALL_FOR = process.env.CALL_FOR || "buynow";     // "buynow" (achats immédiats) ou "all"
 
 // ---------- Utilitaires ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -224,6 +227,25 @@ export function buildNotification(it) {
   };
 }
 
+export function callText(items) {
+  const model = (t) => { const m = t.match(/6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000/); return m ? m[0].replace(/[^0-9]+/g, " ") : "cadran en pierre"; };
+  const it = items[0];
+  const prix = it.price != null ? `${Number(it.price).toLocaleString("fr-FR")} yens` : (it.priceText || "prix sur l'annonce");
+  let t = `Alerte Seiko sardonyx. Nouvelle annonce ${it.source.replace("r/", "reddit ")}, ${model(it.title)}, ${prix}.`;
+  if (items.length > 1) t += ` Et ${items.length - 1} autre${items.length > 2 ? "s" : ""}.`;
+  return (t + " Regarde tes notifications n t f y.").slice(0, 250);
+}
+
+async function call(items, fetchFn = fetch) {
+  const text = callText(items);
+  if (DRY) { console.log("[DRY] appel:", text); return; }
+  const url = `https://api.callmebot.com/start.php?user=${encodeURIComponent(CALL_USER)}&text=${encodeURIComponent(text)}&lang=fr-FR-Standard-A&rpt=2&cc=missed`;
+  try {
+    const res = await fetchFn(url);
+    console.log("callmebot HTTP", res.status, (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200));
+  } catch (e) { console.error("callmebot", e.message); }
+}
+
 async function send(payload, fetchFn = fetch) {
   if (DRY) { console.log("[DRY] notification:", JSON.stringify(payload)); return; }
   const res = await fetchFn(NTFY_SERVER, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -273,6 +295,7 @@ export async function run({ fetchFn = fetch, state } = {}) {
   }
 
   let sent = 0;
+  const toCall = [];
   for (const it of found.values()) {
     if (state.seen[it.key]) continue;
     state.seen[it.key] = now;
@@ -280,7 +303,12 @@ export async function run({ fetchFn = fetch, state } = {}) {
     if (now - it.created > MAX_AGE_H * 3600e3) continue;
     await send(buildNotification(it), fetchFn);
     sent++;
+    if (CALL_FOR === "all" || it.buyNow) toCall.push(it);
   }
+  // un seul appel par passage, même s'il y a plusieurs annonces
+  if (CALL_USER && toCall.length) await call(toCall, fetchFn);
+  if (CALL_USER && process.env.TEST_CALL === "1") await call([{ source: "test", title: "6020-5280", price: 98000 }], fetchFn);
+
   if (firstRun) {
     await send({ topic: NTFY_TOPIC, title: "✅ Bot sardonyx actif", message: `${found.size} annonce(s) déjà en ligne mémorisées. Tu recevras désormais une alerte pour chaque nouvelle annonce.\nMercari : ${ok.mercari}/${KEYWORDS.length} · Yahoo : ${ok.yahoo}/${KEYWORDS.length} · Rakuma : ${ok.rakuma}/${KEYWORDS.length} · Reddit : ${ok.reddit ? "OK" : "échec"}`, priority: 3, tags: ["watch"] }, fetchFn);
   }
