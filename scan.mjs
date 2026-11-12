@@ -245,9 +245,11 @@ async function call(items, fetchFn = fetch) {
     try {
       const res = await fetchFn(url);
       const body = (await res.text()).replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-      const busy = /FLOOD|skipped|busy|queue is full|try again|ERROR/i.test(body);
-      console.log(`callmebot essai ${attempt}: HTTP ${res.status} ${busy ? "SATURÉ" : "OK"} | ${body.slice(-220)}`);
-      if (res.ok && !busy) return true;
+      const queued = /call (has been )?queued|Call queued/i.test(body);
+      const refused = /FLOOD|skipped|ERROR/i.test(body);
+      const ok = res.ok && (queued || !refused);
+      console.log(`callmebot essai ${attempt}: HTTP ${res.status} ${ok ? "OK" : "REFUSÉ"} | ${body.slice(-220)}`);
+      if (ok) return true;
     } catch (e) { console.error("callmebot", e.message); }
     if (attempt < 6) await sleep(fetchFn === fetch ? 70000 : 0);
   }
