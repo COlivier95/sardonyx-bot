@@ -240,10 +240,18 @@ async function call(items, fetchFn = fetch) {
   const text = callText(items);
   if (DRY) { console.log("[DRY] appel:", text); return; }
   const url = `https://api.callmebot.com/start.php?user=${encodeURIComponent(CALL_USER)}&text=${encodeURIComponent(text)}&lang=fr-FR-Standard-A&rpt=2&cc=missed`;
-  try {
-    const res = await fetchFn(url);
-    console.log("callmebot HTTP", res.status, (await res.text()).replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 500));
-  } catch (e) { console.error("callmebot", e.message); }
+  // le service gratuit est parfois saturé ("FLOOD") : on réessaie jusqu'à 6 fois sur ~4 min
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      const res = await fetchFn(url);
+      const body = (await res.text()).replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+      const busy = /FLOOD|skipped|busy|queue is full|try again/i.test(body);
+      console.log(`callmebot essai ${attempt}: HTTP ${res.status} ${busy ? "SATURÉ" : "OK"} | ${body.slice(-220)}`);
+      if (res.ok && !busy) return true;
+    } catch (e) { console.error("callmebot", e.message); }
+    if (attempt < 6) await sleep(fetchFn === fetch ? 40000 : 0);
+  }
+  return false;
 }
 
 async function send(payload, fetchFn = fetch) {
