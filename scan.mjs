@@ -29,10 +29,11 @@ const STATE_FILE = "seen.json";
 const DRY = process.env.DRY_RUN === "1";
 // Réveil iPhone : ntfy envoie aussi un e-mail "SARDONYX" → une automatisation Raccourcis lance un minuteur.
 // Actif seulement si les secrets NTFY_TOKEN (compte ntfy gratuit) et ALERT_EMAIL existent.
-const NTFY_TOKEN = process.env.NTFY_TOKEN;
-const ALERT_EMAIL = process.env.ALERT_EMAIL;
+const NTFY_TOKEN = (process.env.NTFY_TOKEN || "").trim();
+const ALERT_EMAIL = (process.env.ALERT_EMAIL || "").trim();
 const WAKE_FOR = process.env.WAKE_FOR || "buynow";     // "buynow" (achats immédiats) ou "all"
 const WAKE = Boolean(NTFY_TOKEN && ALERT_EMAIL);
+if (NTFY_TOKEN) console.log(`jeton ntfy : ${NTFY_TOKEN.slice(0, 3)}… (${NTFY_TOKEN.length} caractères) · e-mail : ${ALERT_EMAIL.replace(/^(.).*@/, "$1…@")}`);
 
 // ---------- Utilitaires ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -232,10 +233,18 @@ export function buildNotification(it) {
 
 async function send(payload, fetchFn = fetch) {
   if (DRY) { console.log("[DRY] notification:", JSON.stringify(payload)); return; }
+  // le jeton ne sert qu'aux e-mails de réveil ; les alertes normales restent anonymes
   const headers = { "Content-Type": "application/json" };
-  if (NTFY_TOKEN) headers.Authorization = `Bearer ${NTFY_TOKEN}`;
-  const res = await fetchFn(NTFY_SERVER, { method: "POST", headers, body: JSON.stringify(payload) });
-  if (!res.ok) console.error("ntfy HTTP", res.status, await res.text());
+  if (payload.email && NTFY_TOKEN) headers.Authorization = `Bearer ${NTFY_TOKEN}`;
+  let res = await fetchFn(NTFY_SERVER, { method: "POST", headers, body: JSON.stringify(payload) });
+  if (!res.ok) {
+    console.error("ntfy HTTP", res.status, await res.text(), payload.email ? "(avec e-mail)" : "");
+    if (payload.email) { // filet de sécurité : renvoyer sans e-mail pour ne jamais perdre l'alerte
+      const { email, ...rest } = payload;
+      res = await fetchFn(NTFY_SERVER, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rest) });
+      if (!res.ok) console.error("ntfy HTTP (sans e-mail)", res.status, await res.text());
+    }
+  }
 }
 
 // ---------- Boucle principale ----------
