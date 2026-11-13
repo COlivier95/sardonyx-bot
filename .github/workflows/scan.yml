@@ -45,4 +45,7 @@ jobs:
           git config user.name "sardonyx-bot"
           git config user.email "sardonyx-bot@users.noreply.github.com"
           git add seen.json keepalive.txt 2>/dev/null || git add seen.json
-          git diff --cached --quiet || (git commit -m "scan: annonces vues" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "scan: annonces vues"
+            for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break; sleep 5; done
+          fi
