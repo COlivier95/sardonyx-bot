@@ -2,7 +2,7 @@ name: Scan sardonyx
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # toutes les 5 min (GitHub peut décaler de quelques minutes)
+    - cron: "3-58/5 * * * *"  # toutes les 5 min, décalé des heures pile (GitHub peut en sauter)
   workflow_dispatch:         # bouton "Run workflow" pour tester à la main
     inputs:
       test_wake:
