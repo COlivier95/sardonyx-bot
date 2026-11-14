@@ -42,6 +42,11 @@ const yen = (n) => "¥" + Number(n).toLocaleString("en-US");
 const usd = (n) => "≈$" + Math.round(Number(n) / FX).toLocaleString("en-US");
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
+// Titre qui parle d'un cadran noir sans évoquer la pierre / le brun / le bleu : on prévient sans réveiller
+const BLACKISH = /ブラック|黒|black|オニキス|onyx/i;
+const COLOR_OK = /サードニクス|サードニックス|サードオニキス|sardonyx|瑪瑙|メノウ|agate|木目|wood|ブラウン|茶|brown|ブルー|青|blue|石文字盤|ストーン文字盤|stone dial/i;
+export function probablyBlack(title) { return BLACKISH.test(title) && !COLOR_OK.test(title); }
+
 export function isMatch(title) {
   if (!title || EXCLUDE.test(title)) return false;
   if (STRONG.test(title)) return true;
@@ -298,7 +303,8 @@ export async function run({ fetchFn = fetch, state } = {}) {
     if (firstRun || !state.seeded[it.key.split(":")[0]]) continue;
     if (now - it.created > MAX_AGE_H * 3600e3) continue;
     const n = buildNotification(it);
-    if (WAKE && (WAKE_FOR === "all" || it.buyNow)) { n.email = ALERT_EMAIL; n.title = "SARDONYX " + n.title; }
+    if (probablyBlack(it.title)) { n.title = "(probablement noir) " + n.title; n.priority = 3; }
+    else if (WAKE && (WAKE_FOR === "all" || it.buyNow)) { n.email = ALERT_EMAIL; n.title = "SARDONYX " + n.title; }
     await send(n, fetchFn);
     sent++;
   }
