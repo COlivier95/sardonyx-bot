@@ -279,7 +279,9 @@ export async function run({ fetchFn = fetch, state } = {}) {
   }
 
   // santé des sources : alerte après 6 échecs complets d'affilée (~30 min), puis au retour
-  for (const src of Object.keys(ok)) {
+  // Reddit bloque souvent les serveurs GitHub : ses pannes restent silencieuses
+  delete state.fails.reddit;
+  for (const src of Object.keys(ok).filter((s) => s !== "reddit")) {
     if (ok[src] === 0) {
       state.fails[src]++;
       if (state.fails[src] === 6) await send({ topic: NTFY_TOPIC, title: `⚠️ Bot sardonyx : ${src} ne répond plus`, message: "Le bot continue d'essayer. Il te préviendra quand ça repart.", priority: 3, tags: ["warning"] }, fetchFn);
