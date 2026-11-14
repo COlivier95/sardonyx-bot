@@ -100,7 +100,7 @@ export async function searchMercari(keyword, fetchFn = fetch) {
       created: Number(i.created) * 1000,
       image: i.thumbnails?.[0] || null,
       url: shop ? `https://jp.mercari.com/shops/product/${i.id}` : `https://jp.mercari.com/item/${i.id}`,
-      buyee: shop ? null : `https://buyee.jp/mercari/item/${i.id}`,
+      buyee: shop ? `https://buyee.jp/mercari/search?keyword=${encodeURIComponent(String(i.name).slice(0, 40))}` : `https://buyee.jp/mercari/item/${i.id}`,
       buyNow: true,
     };
   });
@@ -134,7 +134,7 @@ export function parseYahoo(html) {
       created: start ? Date.parse(start) : stm ? Number(stm[1]) * 1000 : Date.now(),
       image: get("imageUrl"),
       url: flea ? `https://paypayfleamarket.yahoo.co.jp/item/${id}` : `https://auctions.yahoo.co.jp/jp/auction/${id}`,
-      buyee: flea ? null : `https://buyee.jp/item/yahoo/auction/${id}`,
+      buyee: flea ? `https://buyee.jp/paypayfleamarket/item/${id}` : `https://buyee.jp/item/yahoo/auction/${id}`,
       buyNow: flea,
     });
   }
@@ -165,7 +165,7 @@ export function parseRakuma(html) {
       key: "rakuma:" + id, source: "Rakuma", title: unescapeHtml(name[1]),
       price: price ? Number(price[1]) : null, created: Date.now(),
       image: img ? img[1] : null, url: `https://item.fril.jp/${id}`,
-      buyee: null, buyNow: true,
+      buyee: `https://buyee.jp/rakuma/item/${id}`, buyNow: true,
     });
   }
   return [...out.values()];
@@ -222,13 +222,14 @@ export function buildNotification(it) {
     if (it.buyNowPrice) lines.push(`Achat immédiat possible : ${yen(it.buyNowPrice)} (${usd(it.buyNowPrice)})`);
     if (it.end) lines.push(`Fin : ${pacific(it.end)} (heure de Californie)`);
   }
-  const actions = [{ action: "view", label: "Voir sur " + it.source.replace(/!.*/, "").replace(" Shops", ""), url: it.url, clear: false }];
-  if (it.buyee) actions.push({ action: "view", label: "Ouvrir dans Buyee", url: it.buyee, clear: false });
+  const actions = [];
+  if (it.buyee) actions.push({ action: "view", label: "Acheter via Buyee", url: it.buyee, clear: false });
+  actions.push({ action: "view", label: "Voir l'annonce d'origine", url: it.url, clear: false });
   return {
     topic: NTFY_TOPIC,
     title: `${it.buyNow ? "⚡" : "🔨"} ${it.source}${it.price != null ? " · " + yen(it.price) : it.priceText ? " · " + it.priceText : ""}`,
     message: lines.join("\n"),
-    click: it.url,
+    click: it.buyee || it.url,
     attach: it.image || undefined,
     priority: it.buyNow ? 5 : 4,
     tags: ["watch"],
