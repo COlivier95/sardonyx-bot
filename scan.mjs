@@ -19,7 +19,7 @@ const STRONG = /6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000|CHG\s
 const STONE = /サードニクス|サードニックス|サードオニキス|sardonyx|瑪瑙|メノウ|めのう|agate|木目|タイガーアイ|石文字盤|天然石|ストーン文字盤|ストーンダイヤル|stone dial|wood ?grain|tiger ?eye/i;
 const SEIKO = /seiko|セイコー|せいこー|シャリオ|チャリオ|chariot|ドルチェ|dolce/i;
 // Exclus : autres gammes, objets, cadrans explicitement noirs
-const EXCLUDE = /クレドール|credor|置時計|置き時計|壁掛け|掛け時計|掛時計|柱時計|目覚まし|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial|三菱|グランディス|ブレーキ|ワイパー|ヘッドライト|ルームランプ|シフトノブ|ステアリング|ハンドル|N84W|N94W/i;
+const EXCLUDE = /クレドール|credor|置時計|置き時計|懐中時計|pocket watch|壁掛け|掛け時計|掛時計|柱時計|目覚まし|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial|三菱|グランディス|ブレーキ|ワイパー|ヘッドライト|ルームランプ|シフトノブ|ステアリング|ハンドル|N84W|N94W/i;
 
 const NTFY_TOPIC = process.env.NTFY_TOPIC;           // obligatoire (secret GitHub)
 const NTFY_SERVER = process.env.NTFY_SERVER || "https://ntfy.sh";
@@ -200,16 +200,28 @@ export function parseRedditRss(xml) {
   return out;
 }
 export async function searchReddit(_kw, fetchFn = fetch) {
-  const headers = { "User-Agent": REDDIT_UA };
-  let res = await fetchFn("https://www.reddit.com/r/Watchexchange/new.json?limit=100&raw_json=1", { headers });
-  if (res.ok) {
-    const j = await res.json();
-    return (j.data?.children || []).map((c) => redditItem({ id: c.data.id, title: c.data.title, url: "https://www.reddit.com" + c.data.permalink, created: c.data.created_utc }))
-      .filter((it) => !/\[\s*WTB\s*\]/i.test(it.title));
+  const headers = { "User-Agent": REDDIT_UA, Accept: "application/json, application/atom+xml" };
+  const notWtb = (it) => !/\[\s*WTB\s*\]/i.test(it.title);
+  const errors = [];
+  for (const host of ["https://www.reddit.com", "https://old.reddit.com", "https://api.reddit.com"]) {
+    const path = host.includes("api.") ? "/r/Watchexchange/new?limit=100&raw_json=1" : "/r/Watchexchange/new.json?limit=100&raw_json=1";
+    try {
+      const res = await fetchFn(host + path, { headers });
+      if (res.ok) {
+        const j = await res.json();
+        return (j.data?.children || []).map((c) => redditItem({ id: c.data.id, title: c.data.title, url: "https://www.reddit.com" + c.data.permalink, created: c.data.created_utc })).filter(notWtb);
+      }
+      errors.push(`${host.replace("https://", "")} ${res.status}`);
+    } catch (e) { errors.push(`${host.replace("https://", "")} ${e.message}`); }
   }
-  res = await fetchFn("https://www.reddit.com/r/Watchexchange/new/.rss?limit=100", { headers });
-  if (!res.ok) throw new Error(`Reddit HTTP ${res.status}`);
-  return parseRedditRss(await res.text()).filter((it) => !/\[\s*WTB\s*\]/i.test(it.title));
+  for (const host of ["https://www.reddit.com", "https://old.reddit.com"]) {
+    try {
+      const res = await fetchFn(host + "/r/Watchexchange/new/.rss?limit=100", { headers });
+      if (res.ok) return parseRedditRss(await res.text()).filter(notWtb);
+      errors.push(`${host.replace("https://", "")} rss ${res.status}`);
+    } catch (e) { errors.push(`rss ${e.message}`); }
+  }
+  throw new Error("Reddit " + errors.join(", "));
 }
 
 // ---------- Notifications (ntfy) ----------
