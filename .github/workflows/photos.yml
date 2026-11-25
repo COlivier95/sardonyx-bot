@@ -1,0 +1,35 @@
+name: Photos d'une annonce
+on:
+  workflow_dispatch:
+    inputs:
+      auction:
+        description: "ID d'enchère Yahoo"
+        required: true
+permissions:
+  contents: read
+jobs:
+  photos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Télécharger les photos
+        run: |
+          mkdir photos
+          curl -sL -A "Mozilla/5.0" "https://auctions.yahoo.co.jp/jp/auction/${{ inputs.auction }}" -o page.html
+          grep -oE 'https://auctions\.c\.yimg\.jp/images\.auctions\.yahoo\.co\.jp/image/[^"\\? ]+\.jpg' page.html | sort -u | head -8 > urls.txt
+          cat urls.txt
+          n=0; while read u; do n=$((n+1)); curl -sL -A "Mozilla/5.0" "$u" -o photos/$n.jpg; done < urls.txt
+          ls -la photos
+          python3 - <<'PY'
+          import re,html
+          s=open('page.html',encoding='utf-8',errors='ignore').read()
+          s=s.replace('\\"','"')
+          for k in ['title','price','bidCount','endTime','itemCondition']:
+              m=re.search('"%s":("([^"]*)"|[^,}]+)'%k,s); print(k, m.group(1) if m else None)
+          t=re.sub(r'<script[\s\S]*?</script>','',open('page.html',encoding='utf-8',errors='ignore').read()); t=re.sub(r'<[^>]+>','\n',t)
+          i=t.find('商品説明'); print('DESC', re.sub(r'\s+',' ',html.unescape(t[i:i+1500])))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: photos
+          path: photos/
