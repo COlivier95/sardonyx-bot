@@ -12,14 +12,15 @@ const KEYWORDS = [
   "セイコー サードニクス", "シャリオ サードニクス", "サードオニキス セイコー",
   "セイコー 瑪瑙 文字盤", "セイコー メノウ 文字盤", "セイコー 木目 文字盤",
   "シャリオ 木目", "シャリオ ブラウン", "チャリオ セイコー", "ドルチェ 6020",
+  "9940-7010", "グランドクォーツ サードニクス", "グランドクォーツ ブラウン", "グランドクオーツ 9940",
 ];
 // Un titre est retenu s'il contient un calibre / une référence…
-const STRONG = /6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000|CHG\s?803|CGT\s?0?31|CGT\s?073|AGT\s?023/i;
+const STRONG = /6020[\s\-ー‐－―]*52[68]0|7820[\s\-ー‐－―]*5000|CHG\s?803|CGT\s?0?31|CGT\s?073|AGT\s?023|9940[\s\-ー‐－―]*7010/i;
 // …ou un mot "pierre" ET un mot "Seiko"
 const STONE = /サードニクス|サードニックス|サードオニキス|sardonyx|瑪瑙|メノウ|めのう|agate|木目|タイガーアイ|石文字盤|天然石|ストーン文字盤|ストーンダイヤル|stone dial|wood ?grain|tiger ?eye/i;
-const SEIKO = /seiko|セイコー|せいこー|シャリオ|チャリオ|chariot|ドルチェ|dolce/i;
+const SEIKO = /seiko|セイコー|せいこー|シャリオ|チャリオ|chariot|ドルチェ|dolce|グランドクォーツ|グランドクオーツ|grand ?quartz/i;
 // Exclus : autres gammes, objets, cadrans explicitement noirs
-const EXCLUDE = /クレドール|credor|置時計|置き時計|懐中時計|pocket watch|壁掛け|掛け時計|掛時計|柱時計|目覚まし|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial|三菱|グランディス|ブレーキ|ワイパー|ヘッドライト|ルームランプ|シフトノブ|ステアリング|ハンドル|N84W|N94W/i;
+const EXCLUDE = /クレドール|credor|置時計|置き時計|懐中時計|pocket watch|壁掛け|掛け時計|掛時計|柱時計|目覚まし|クロック|clock|ネックレス|ペンダント|指輪|リング|ブローチ|ルース|原石|ブラックオニキス|オニキスブラック|ブラックストーン|black ?stone|黒文字盤|ブラック文字盤|ブラックダイヤル|black dial|三菱|グランディス|ブレーキ|ワイパー|ヘッドライト|ルームランプ|シフトノブ|ステアリング|ハンドル|N84W|N94W/i;
 
 const NTFY_TOPIC = process.env.NTFY_TOPIC;           // obligatoire (secret GitHub)
 const NTFY_SERVER = process.env.NTFY_SERVER || "https://ntfy.sh";
