@@ -6,7 +6,7 @@ on:
         description: "ID d'enchère Yahoo"
         required: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   photos:
     runs-on: ubuntu-latest
@@ -27,9 +27,11 @@ jobs:
           for k in ['title','price','bidCount','endTime','itemCondition']:
               m=re.search('"%s":("([^"]*)"|[^,}]+)'%k,s); print(k, m.group(1) if m else None)
           t=re.sub(r'<script[\s\S]*?</script>','',open('page.html',encoding='utf-8',errors='ignore').read()); t=re.sub(r'<[^>]+>','\n',t)
-          i=t.find('商品説明'); print('DESC', re.sub(r'\s+',' ',html.unescape(t[i:i+1500])))
+          i=t.find('商品説明'); print('DESC', re.sub(r'\s+',' ',html.unescape(t[i:i+2500])))
           PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: photos
-          path: photos/
+      - name: Déposer les photos dans une branche dédiée
+        run: |
+          cd photos
+          git init -q -b photos && git config user.name bot && git config user.email bot@users.noreply.github.com
+          git add . && git commit -q -m "photos ${{ inputs.auction }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" photos:photos-${{ inputs.auction }}
