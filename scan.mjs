@@ -4,7 +4,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 
 // ---------- Réglages ----------
-const KEYWORDS = [
+export const KEYWORDS = [
   // calibres et références catalogue
   "6020-5260", "6020-5280", "7820-5000",
   "CGT031", "CGT073", "AGT023", "CHG803",
