@@ -1,0 +1,24 @@
+name: Photos eBay
+on:
+  workflow_dispatch:
+    inputs:
+      item: { description: "Numéro d'objet eBay", required: true }
+permissions:
+  contents: write
+jobs:
+  get:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Photos et description
+        run: |
+          mkdir out && cd out
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36"
+          curl -sL -A "$UA" "https://www.ebay.com/itm/${{ inputs.item }}" -o page.html
+          grep -o 'i.ebayimg.com/images/g/[A-Za-z0-9_-]*' page.html | sort -u | head -20 > ids.txt
+          n=0; while read u; do n=$((n+1)); curl -sL -A "$UA" "https://$u/s-l1600.jpg" -o "$n.jpg"; done < ids.txt
+          curl -sL -A "$UA" "https://vi.vipr.ebaydesc.com/itmdesc/${{ inputs.item }}" -o desc.html
+          python3 -c "import re,html;t=open('desc.html',errors='ignore').read();t=re.sub(r'<(script|style)[\s\S]*?</\1>',' ',t);print('DESC',re.sub(r'\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',t)))[:4000])"
+          rm page.html
+          git init -q -b p && git config user.name bot && git config user.email bot@users.noreply.github.com
+          git add . && git commit -q -m "ebay ${{ inputs.item }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" p:ebay-${{ inputs.item }}
